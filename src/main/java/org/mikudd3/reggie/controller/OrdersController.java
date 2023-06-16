@@ -48,12 +48,37 @@ public class OrdersController {
 
     /**
      * 用户下单
+     *
      * @param orders
      * @return
      */
     @PostMapping("/submit")
-    public R<String> submit(@RequestBody Orders orders){
+    public R<String> submit(@RequestBody Orders orders) {
         ordersService.submit(orders);
         return R.success("下单成功");
     }
+
+
+    /**
+     * 用户订单分页查询
+     *
+     * @param page
+     * @param pageSize
+     * @return
+     */
+    @GetMapping("/userPage")
+    public R<Page> page(int page, int pageSize) {
+
+        //分页构造器对象
+        Page<Orders> pageInfo = new Page<>(page, pageSize);
+        //构造条件查询对象
+        LambdaQueryWrapper<Orders> queryWrapper = new LambdaQueryWrapper<>();
+
+        //添加排序条件，根据更新时间降序排列
+        queryWrapper.orderByDesc(Orders::getOrderTime);
+        ordersService.page(pageInfo, queryWrapper);
+
+        return R.success(pageInfo);
+    }
+
 }
