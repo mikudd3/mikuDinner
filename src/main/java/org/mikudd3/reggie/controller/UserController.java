@@ -9,10 +9,12 @@ import org.mikudd3.reggie.service.UserService;
 import org.mikudd3.reggie.util.SMSUtils;
 import org.mikudd3.reggie.util.ValidateCodeUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpSession;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @project:
@@ -27,6 +29,8 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 发送短信
@@ -49,7 +53,10 @@ public class UserController {
             //SMSUtils.sendMessage("mikudd3", "", phone, code);
 
             //将短信保持到session
-            session.setAttribute(phone, code);
+            //session.setAttribute(phone, code);
+
+            //将验证码保存到redis中，并将其过期时间设为5分钟
+            redisTemplate.opsForValue().set(phone, code, 5, TimeUnit.MINUTES);
             return R.success("短信发送成功");
         }
 
@@ -71,7 +78,9 @@ public class UserController {
         //获取验证码
         String code = (String) map.get("code");
         //从session获取保持的验证码
-        String sessionCode = (String) session.getAttribute(phone);
+        //String sessionCode = (String) session.getAttribute(phone);
+        //将验证码从redis中获取验证码
+        String sessionCode = (String) redisTemplate.opsForValue().get(phone);
         //进行验证码比较
         if (sessionCode != null && sessionCode.equals(code)) {
             //登录成功
@@ -88,6 +97,8 @@ public class UserController {
                 userService.save(user);
             }
             session.setAttribute("user", user.getId());
+            //登录成功，则将redis中缓存的验证码删除
+            redisTemplate.delete(phone);
             return R.success(user);
         }
 

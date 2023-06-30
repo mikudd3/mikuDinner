@@ -11,11 +11,13 @@ import org.mikudd3.reggie.entity.*;
 import org.mikudd3.reggie.service.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -35,7 +37,8 @@ public class DishController {
     private CategoryService categoryService;
     @Autowired
     private DishFlavorService dishFlavorService;
-
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 新增菜品
@@ -48,6 +51,11 @@ public class DishController {
         log.info(String.valueOf(dishDto));
         //添加到数据库
         dishService.saveWithFlavor(dishDto);
+
+        //清理某个分类下面的菜品缓存数据
+        String key = "dish_" + dishDto.getCategoryId() + "_1";
+        redisTemplate.delete(key);
+
         return R.success("新增菜品成功");
     }
 
@@ -124,6 +132,11 @@ public class DishController {
         log.info(String.valueOf(dishDto));
         //添加到数据库
         dishService.updateWithFlavor(dishDto);
+
+        //清理某个分类下面的菜品缓存数据
+        String key = "dish_" + dishDto.getCategoryId() + "_1";
+        redisTemplate.delete(key);
+
         return R.success("菜品修改成功");
     }
 
@@ -169,6 +182,17 @@ public class DishController {
      */
     @GetMapping("list")
     public R<List<DishDto>> list(Dish dish) {
+        //先从缓存中查询是否有数据
+        List<DishDto> dishDtoList = null;
+        //动态构造key
+        String key = "dish_" + dish.getCategoryId() + "_" + dish.getStatus();
+        //先从redis中获取缓存数据
+        dishDtoList = (List<DishDto>) redisTemplate.opsForValue().get(key);
+        //如果缓存中有数据，则将其返回
+        if (dishDtoList != null) {
+            return R.success(dishDtoList);
+        }
+        //如果redis缓存中找不到该数据，则从数据库中查找
         //构造查询条件
         LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
         //构建等值条件
@@ -181,7 +205,7 @@ public class DishController {
         List<Dish> list = dishService.list(queryWrapper);
 
         //进行集合的泛型转换
-        List<DishDto> dishDtoList = list.stream().map((item) -> {
+        dishDtoList = list.stream().map((item) -> {
             DishDto dishDto = new DishDto();
             //为一个新的对象赋值，一定要考虑你为它赋过几个值，否则你自己都不知道就返回了null的数据
             //为dishDto对象的基本属性拷贝
@@ -192,7 +216,6 @@ public class DishController {
                 String categoryName = category.getName();
                 dishDto.setCategoryName(categoryName);
             }
-
             //为dishdto赋值flavors属性
             //当前菜品的id
             Long dishId = item.getId();
@@ -207,7 +230,8 @@ public class DishController {
             return dishDto;
         }).collect(Collectors.toList());
 
-
+        //如果不存在，需要查询数据库，将查询到的菜品数据缓存到Redis
+        redisTemplate.opsForValue().set(key, dishDtoList, 60, TimeUnit.MINUTES);
         return R.success(dishDtoList);
     }
 }
