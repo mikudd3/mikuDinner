@@ -28,7 +28,6 @@ public class OrdersController {
 
     @GetMapping("/page")
     public R<Page> page(int page, int pageSize, String number, String beginTime, String endTime) {
-
         //分页构造器
         Page<Orders> pageInfo = new Page<>(page, pageSize);
         //构造条件查询对象
@@ -80,5 +79,13 @@ public class OrdersController {
 
         return R.success(pageInfo);
     }
+
+    @PutMapping()
+    public R update(@RequestBody Orders orders) {
+        //根据id更新数据
+        ordersService.updateById(orders);
+        return R.success("状态更新成功");
+    }
+
 
 }

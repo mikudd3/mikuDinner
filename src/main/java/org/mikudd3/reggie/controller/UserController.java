@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -103,5 +104,18 @@ public class UserController {
         }
 
         return R.error("登录失败");
+    }
+
+    /**
+     * 退出登录
+     *
+     * @param request
+     * @return
+     */
+    @RequestMapping("/logout")
+    public R<String> logout(HttpServletRequest request) {
+        //清理session中保存的id信息
+        request.getSession().removeAttribute("user");
+        return R.success("退出成功");
     }
 }
